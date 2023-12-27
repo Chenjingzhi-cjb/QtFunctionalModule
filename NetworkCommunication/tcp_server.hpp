@@ -32,7 +32,7 @@ public:
 
     ~TcpServer() = default;
 
-public:
+public slots:
     void sendAsciiData(const QByteArray &ascii_data, const QHostAddress &address = QHostAddress::Null) {
         if (address.isNull()) {
             if (m_clients.size() == 1) {
@@ -101,6 +101,7 @@ public:
         }
     }
 
+public:
     QTcpSocket *findClientByAddress(const QHostAddress &address) {
         for (auto it = m_clients.begin(); it != m_clients.end(); ++it) {
             auto *client_socket = *it;
@@ -111,6 +112,11 @@ public:
 
         return nullptr;
     }
+
+signals:
+    void signalReceiveAsciiData(const std::string &client_ip, const std::string &data);
+
+    void signalReceiveHexData(const std::string &client_ip, const std::string &data);
 
 private slots:
     void onNewConnection() {
@@ -144,17 +150,12 @@ private slots:
         auto *client_socket = qobject_cast<QTcpSocket *>(sender());
         if (!client_socket) return;
 
-        std::cout << "Disconnection from tcp client: " << clientPeerAddressString() << std::endl;
+        std::cout << "Disconnected from tcp client: " << clientPeerAddressString() << std::endl;
 
         m_clients.removeOne(client_socket);
         client_socket->disconnect();
         client_socket->deleteLater();
     }
-
-signals:
-    void signalReceiveAsciiData(const std::string &client_ip, const std::string &data);
-
-    void signalReceiveHexData(const std::string &client_ip, const std::string &data);
 
 private:
     void connectClientSignals(QTcpSocket *client_socket) {
@@ -162,7 +163,7 @@ private:
         connect(client_socket, &QTcpSocket::disconnected, this, &TcpServer::onClientDisconnected);
     }
 
-    std::string getIPv4FromPeerAddress(const QHostAddress &peer_address) {
+    static std::string getIPv4FromPeerAddress(const QHostAddress &peer_address) {
         // peerAddress(): return "IPv4-mapped IPv6 address" like "::ffff:192.168.1.102"
         // this method: return "IPv4 address"(std::string) like "192.168.1.102"
         return peer_address.toString().split(":").last().toStdString();
