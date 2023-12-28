@@ -27,9 +27,16 @@ public:
     ~TcpClient() = default;
 
 public slots:
+    void connectToServer(const QString &server_name, unsigned short port) {
+        m_client.connectToHost(server_name, port);
+        m_server_info = server_name.toStdString() + ":" + std::to_string(port);
+
+        std::cout << "Connecting to tcp server: " << m_server_info << std::endl;
+    }
+
     void connectToServer(const QHostAddress &server_address, unsigned short port) {
         m_client.connectToHost(server_address, port);
-        m_server_info = getIPv4FromPeerAddress(server_address) + ":" + std::to_string(port);
+        m_server_info = server_address.toString().toStdString() + ":" + std::to_string(port);
 
         std::cout << "Connecting to tcp server: " << m_server_info << std::endl;
     }
@@ -83,13 +90,6 @@ private slots:
 
     void onSocketError(QAbstractSocket::SocketError socketError) {
         std::cout << "Tcp socket error: " << socketError << std::endl;
-    }
-
-private:
-    static std::string getIPv4FromPeerAddress(const QHostAddress &peer_address) {
-        // peerAddress(): return "IPv4-mapped IPv6 address" like "::ffff:192.168.1.102"
-        // this method: return "IPv4 address"(std::string) like "192.168.1.102"
-        return peer_address.toString().split(":").last().toStdString();
     }
 
 private:
