@@ -7,9 +7,54 @@
 #include <QSerialPort>
 #include <QSerialPortInfo>
 #include <QMutex>
+#include <QThread>
 
 #include <iostream>
 #include <string>
+
+
+class SerialPort;
+
+
+class SerialPortSendThread : public QThread {
+    Q_OBJECT
+
+public:
+    SerialPortSendThread(SerialPort *serial_port, QString data, bool data_type,
+                         unsigned int intervals, unsigned int times,
+                         bool &thread_flag, QObject *parent = nullptr);
+
+    ~SerialPortSendThread() = default;
+
+protected:
+    void run() override {
+        if (m_times == 0) {
+            while (m_thread_flag) {
+                QThread::msleep(m_intervals);
+
+                emit signalSendData(m_data);
+            }
+        } else {  // m_times != 0
+            for (unsigned int i = 0; i < m_times; i++) {
+                if (!m_thread_flag) break;
+
+                QThread::msleep(m_intervals);
+
+                emit signalSendData(m_data);
+            }
+        }
+    }
+
+signals:
+    void signalSendData(const QString &data);
+
+private:
+    QString m_data;
+    unsigned int m_intervals;
+    unsigned int m_times;
+
+    bool &m_thread_flag;
+};
 
 
 class SerialPort : public QObject {
@@ -23,7 +68,8 @@ public:
                QSerialPort::StopBits stop_bits = QSerialPort::OneStop,
                QSerialPort::FlowControl flow_control = QSerialPort::NoFlowControl,
                QObject *parent = nullptr)
-            : QObject(parent) {
+            : QObject(parent),
+              m_send_thread_flag(true) {
         m_serial.setPortName(port_name);
         if (m_serial.open(QIODevice::ReadWrite)) {
             std::cout << "The serial port opened successfully! "
@@ -48,10 +94,31 @@ public:
         }
     }
 
+public slots:
+    void sendAsciiDataQ(const QString &ascii_data) {
+        sendAsciiData(ascii_data.toStdString());
+    }
+
+    void sendHexDataQ(const QString &hex_data) {
+        sendHexData(hex_data.toStdString());
+    }
+
+    void sendContinueAsciiDataQ(const QString &ascii_data, unsigned int intervals, unsigned int times = 0) {
+        sendContinueAsciiData(ascii_data.toStdString(), intervals, times);
+    }
+
+    void sendContinueHexDataQ(const QString &hex_data, unsigned int intervals, unsigned int times = 0) {
+        sendContinueHexData(hex_data.toStdString(), intervals, times);
+    }
+
+    void stopSendContinue() {
+        m_send_thread_flag = false;
+    }
+
 public:
     bool isOpen() {
         return m_serial.isOpen();
-    };
+    }
 
     void sendAsciiData(const std::string &ascii_data) {
         QMutexLocker locker(&m_serial_mutex);
@@ -80,6 +147,26 @@ public:
         }
     }
 
+    void sendContinueAsciiData(const std::string &ascii_data, unsigned int intervals, unsigned int times = 0) {
+        m_send_thread_flag = true;
+
+        SerialPortSendThread *thread = new SerialPortSendThread(this, QString::fromStdString(ascii_data), false, intervals, times, m_send_thread_flag);
+
+        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+
+        thread->start();
+    }
+
+    void sendContinueHexData(const std::string &hex_data, unsigned int intervals, unsigned int times = 0) {
+        m_send_thread_flag = true;
+
+        SerialPortSendThread *thread = new SerialPortSendThread(this, QString::fromStdString(hex_data), true, intervals, times, m_send_thread_flag);
+
+        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+
+        thread->start();
+    }
+
 private slots:
     void onReadyRead() {
         QByteArray _data = m_serial.readAll();
@@ -103,7 +190,27 @@ signals:
 private:
     QSerialPort m_serial;
     QMutex m_serial_mutex;
+
+    bool m_send_thread_flag;
 };
+
+
+/*
+SerialPortSendThread::SerialPortSendThread(SerialPort *serial_port, QString data, bool data_type,
+                                           unsigned int intervals, unsigned int times,
+                                           bool &thread_flag, QObject *parent)
+        : QThread(parent),
+          m_data(data),
+          m_intervals(intervals),
+          m_times(times),
+          m_thread_flag(thread_flag) {
+    if (data_type) {  // true - hex
+        connect(this, &SerialPortSendThread::signalSendData, serial_port, &SerialPort::sendHexDataQ, Qt::QueuedConnection);
+    } else {  // !data_type, false - ascii
+        connect(this, &SerialPortSendThread::signalSendData, serial_port, &SerialPort::sendAsciiDataQ, Qt::QueuedConnection);
+    }
+}
+*/
 
 
 #endif // SERIAL_PORT_HPP
