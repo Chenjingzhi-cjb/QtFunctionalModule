@@ -57,6 +57,52 @@ private:
 };
 
 
+class SerialPortSendMultiThread : public QThread {
+    Q_OBJECT
+
+public:
+    SerialPortSendMultiThread(SerialPort *serial_port, QStringList data_list, bool data_type,
+                         unsigned int intervals, unsigned int times,
+                         bool &thread_flag, QObject *parent = nullptr);
+
+    ~SerialPortSendMultiThread() = default;
+
+protected:
+    void run() override {
+        if (m_times == 0) {
+            while (m_thread_flag) {
+                QThread::msleep(m_intervals);
+
+                if ((m_data_no += 1) == m_data_list.size()) m_data_no = 0;
+
+                emit signalSendData(m_data_list.at(m_data_no));
+            }
+        } else {  // m_times != 0
+            for (unsigned int i = 0; i < m_times; i++) {
+                if (!m_thread_flag) break;
+
+                QThread::msleep(m_intervals);
+
+                if ((m_data_no += 1) == m_data_list.size()) m_data_no = 0;
+
+                emit signalSendData(m_data_list.at(m_data_no));
+            }
+        }
+    }
+
+signals:
+    void signalSendData(const QString &data);
+
+private:
+    QStringList m_data_list;
+    int m_data_no;
+    unsigned int m_intervals;
+    unsigned int m_times;
+
+    bool &m_thread_flag;
+};
+
+
 class SerialPort : public QObject {
     Q_OBJECT
 
@@ -109,6 +155,30 @@ public slots:
 
     void sendContinueHexDataQ(const QString &hex_data, unsigned int intervals, unsigned int times = 0) {
         sendContinueHexData(hex_data.toStdString(), intervals, times);
+    }
+
+    void sendContinueMultiAsciiDataQ(const QStringList &ascii_data_list, unsigned int intervals, unsigned int times = 0) {
+        if (ascii_data_list.size() == 0) return;
+
+        m_send_thread_flag = true;
+
+        SerialPortSendMultiThread *thread = new SerialPortSendMultiThread(this, ascii_data_list, false, intervals, times, m_send_thread_flag);
+
+        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+
+        thread->start();
+    }
+
+    void sendContinueMultiHexDataQ(const QStringList &hex_data_list, unsigned int intervals, unsigned int times = 0) {
+        if (hex_data_list.size() == 0) return;
+
+        m_send_thread_flag = true;
+
+        SerialPortSendMultiThread *thread = new SerialPortSendMultiThread(this, hex_data_list, true, intervals, times, m_send_thread_flag);
+
+        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+
+        thread->start();
     }
 
     void stopSendContinue() {
@@ -193,24 +263,6 @@ private:
 
     bool m_send_thread_flag;
 };
-
-
-/*
-SerialPortSendThread::SerialPortSendThread(SerialPort *serial_port, QString data, bool data_type,
-                                           unsigned int intervals, unsigned int times,
-                                           bool &thread_flag, QObject *parent)
-        : QThread(parent),
-          m_data(data),
-          m_intervals(intervals),
-          m_times(times),
-          m_thread_flag(thread_flag) {
-    if (data_type) {  // true - hex
-        connect(this, &SerialPortSendThread::signalSendData, serial_port, &SerialPort::sendHexDataQ, Qt::QueuedConnection);
-    } else {  // !data_type, false - ascii
-        connect(this, &SerialPortSendThread::signalSendData, serial_port, &SerialPort::sendAsciiDataQ, Qt::QueuedConnection);
-    }
-}
-*/
 
 
 #endif // SERIAL_PORT_HPP
