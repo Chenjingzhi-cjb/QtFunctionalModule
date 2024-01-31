@@ -47,6 +47,11 @@ void VideoLabelThread::run() {
 void VideoLabel::getImage() {
     // 调用 api 获取更新图像
     // m_image = externalGetImageApi();
+
+    // 使用信号触发获取更新图像
+    // cv::Mat image;
+    // emit signalGetImage(image);
+    // if (!image.empty()) image.copyTo(m_image);
 }
 
 void VideoLabel::processImage() {

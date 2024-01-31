@@ -15,7 +15,7 @@ class VideoLabel;
 
 
 class VideoLabelThread : public QThread {
-    Q_OBJECT;
+    Q_OBJECT
 
 public:
     VideoLabelThread(VideoLabel *video_label, unsigned int sleep_time = 1000, QObject *parent = nullptr);
@@ -133,6 +133,8 @@ protected:
 
 signals:
     void signalGetImageFinish();
+
+    void signalGetImage(cv::Mat &image);
 
 protected:
     VideoLabelThread *m_thread;
