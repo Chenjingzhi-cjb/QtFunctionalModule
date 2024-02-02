@@ -1,3 +1,5 @@
+// .pro: add library opencv
+
 #ifndef VIDEO_LABEL_HPP
 #define VIDEO_LABEL_HPP
 
