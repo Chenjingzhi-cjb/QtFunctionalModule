@@ -66,6 +66,11 @@ public:
         return m_pBuffer;
     }
 
+    void captureUpdateImageSize(int height, int width) {
+        m_image_height = height;
+        m_image_width = width;
+    }
+
     int getExposureTimeMs() {
         return m_exposure_time_ms;
     }
@@ -92,7 +97,7 @@ private:
     class CSampleCaptureEventHandler : public ICaptureEventHandler {
     public:
         void DoOnImageCaptured(CImageDataPointer &objImageDataPointer, void *pUserParam) {
-            CameraController *camera = (CameraController *)pUserParam;
+            CameraController *camera = (CameraController *) pUserParam;
             QMutexLocker locker(camera->getImageMutex());
 
             try {
@@ -100,8 +105,7 @@ private:
                 int height = objImageDataPointer->GetHeight();
                 int width = objImageDataPointer->GetWidth();
 
-                camera->setImageHeight(height);
-                camera->setImageWidth(width);
+                camera->captureUpdateImageSize(height, width);
                 std::memcpy(image_data, objImageDataPointer->GetBuffer(), height * width);
 
                 emit camera->signalUpdateImage(image_data, height, width);
