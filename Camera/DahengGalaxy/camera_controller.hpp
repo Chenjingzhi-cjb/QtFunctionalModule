@@ -23,7 +23,7 @@ private:
               m_bIsSnap(false),
               m_image_height(0),
               m_image_width(0),
-              m_exposure_time_ms(10000),
+              m_exposure_time_us(10000),
               m_exposure_gain_dB(0) {
         cameraInit();
     }
@@ -71,13 +71,15 @@ public:
         m_image_width = width;
     }
 
-    int getExposureTimeMs() {
-        return m_exposure_time_ms;
+    int getExposureTimeUs() {
+        return m_exposure_time_us;
     }
 
-    void setExposureTimeMs(int exposure_time_ms) {
-        m_exposure_time_ms = exposure_time_ms;
-        m_objFeatureControlPtr->GetFloatFeature("ExposureTime")->SetValue(m_exposure_time_ms);
+    void setExposureTimeUs(int exposure_time_us) {
+        if ((exposure_time_us < 10000) || (exposure_time_us > 500000)) return;
+
+        m_exposure_time_us = exposure_time_us;
+        m_objFeatureControlPtr->GetFloatFeature("ExposureTime")->SetValue(m_exposure_time_us);
     }
 
     int getExposureGainDB() {
@@ -85,6 +87,8 @@ public:
     }
 
     void setExposureGainDB(int exposure_gain_dB) {
+        if ((exposure_gain_dB < 0) || (exposure_gain_dB > 24)) return;
+
         m_exposure_gain_dB = exposure_gain_dB;
         m_objFeatureControlPtr->GetFloatFeature("Gain")->SetValue(m_exposure_gain_dB);
     }
@@ -123,7 +127,7 @@ private:
         m_objFeatureControlPtr->GetEnumFeature("TriggerMode")->SetValue("Off");
 
         // 设置 曝光时间
-        m_objFeatureControlPtr->GetFloatFeature("ExposureTime")->SetValue(m_exposure_time_ms);
+        m_objFeatureControlPtr->GetFloatFeature("ExposureTime")->SetValue(m_exposure_time_us);
 
         // 设置 曝光增益
         m_objFeatureControlPtr->GetFloatFeature("Gain")->SetValue(m_exposure_gain_dB);
@@ -345,7 +349,7 @@ private:
     int m_image_height;
     int m_image_width;
 
-    int m_exposure_time_ms;
+    int m_exposure_time_us;
     int m_exposure_gain_dB;
 };
 
