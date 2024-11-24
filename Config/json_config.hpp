@@ -41,7 +41,7 @@ public:
     }
 
 protected:
-    virtual void parseConfig(json_t &config_json_obj) = 0;
+    virtual void parseConfig(const json_t &config_json_obj) = 0;
 };
 
 
@@ -103,9 +103,9 @@ protected:
     void parseConfig(const json_t &config_json_obj) override {
         aa = config_json_obj.at("aa").get<int>();
         bb = config_json_obj.at("bb").get<std::string>();
-        bb = config_json_obj.at("cc").get<std::vector<int>>();
-        bb = config_json_obj.at("dd").get<std::vector<std::string>>();
-        cc = config_json_obj.at("ee").get<std::vector<json_t>>();
+        cc = config_json_obj.at("cc").get<std::vector<int>>();
+        dd = config_json_obj.at("dd").get<std::vector<std::string>>();
+        ee = config_json_obj.at("ee").get<std::vector<json_t>>();
     }
 
 private:
