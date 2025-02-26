@@ -330,7 +330,7 @@ private:
         closeDevice();
 
         delete m_pCaptureEventHandler;
-        delete m_pBuffer;
+        free(m_pBuffer);
     }
 
 private:
