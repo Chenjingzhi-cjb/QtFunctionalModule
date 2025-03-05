@@ -2,13 +2,11 @@
 #define CAMERA_CONTROLLER_HPP
 
 #include <QObject>
-#include <QMutex>
-#include <QMutexLocker>
+#include <QImage>
 
 #include <iostream>
 #include <exception>
 #include <mutex>
-#include <thread>
 
 #include "GalaxyIncludes.h"
 #include "opencv2/opencv.hpp"
@@ -19,7 +17,8 @@ class CameraController : public QObject {
 
 private:
     CameraController()
-            : m_bIsOpen(false),
+            : m_pCaptureEventHandler(nullptr),
+              m_bIsOpen(false),
               m_bIsSnap(false),
               m_image_height(0),
               m_image_width(0),
@@ -28,7 +27,16 @@ private:
         cameraInit();
     }
 
-    ~CameraController() = default;
+    ~CameraController() {
+        if (m_bIsOpen || m_bIsSnap) {
+            closeCamera();
+        }
+
+        if (m_pCaptureEventHandler != nullptr) {
+            delete m_pCaptureEventHandler;
+            m_pCaptureEventHandler = nullptr;
+        }
+    }
 
 public:
     static CameraController &getInstance() {
@@ -37,11 +45,32 @@ public:
         return instance;
     }
 
-    void exitCamera() {
-        cameraClose();
+    void openCamera() {
+        std::lock_guard<std::mutex> locker(m_image_mutex);
+
+        // 打开设备
+        openDevice();
+
+        // 开始采集
+        startSnap();
+
+        // 图像数据内存空间初始化
+        m_image_height = m_objFeatureControlPtr->GetIntFeature("Height")->GetValue();
+        m_image_width = m_objFeatureControlPtr->GetIntFeature("Width")->GetValue();
+        m_buffer_size = m_image_height * m_image_width;
+        m_pBuffer.resize(m_buffer_size);
     }
 
-public:
+    void closeCamera() {
+        // 停止采集
+        stopSnap();
+
+        // 关闭设备
+        closeDevice();
+
+        m_pBuffer.clear();
+    }
+
     int getImageWidth() {
         return m_image_width;
     }
@@ -50,25 +79,22 @@ public:
         return m_image_height;
     }
 
+    int getBufferSize() {
+        return m_buffer_size;
+    }
+
     cv::Mat getImage() {
-        QMutexLocker locker(&m_image_mutex);
+        std::lock_guard<std::mutex> locker(m_image_mutex);
 
-        cv::Mat image(m_image_height, m_image_width, CV_8UC1, m_pBuffer);
-
-        return image;
+        return cv::Mat(m_image_height, m_image_width, CV_8UC1, m_pBuffer.data()).clone();
     }
 
-    QMutex *getImageMutex() {
-        return &m_image_mutex;
+    std::mutex &getImageMutex() {
+        return m_image_mutex;
     }
 
-    void *getBufferPtr() {
+    std::vector<uint8_t> &getBuffer() {
         return m_pBuffer;
-    }
-
-    void captureUpdateImageSize(int height, int width) {
-        m_image_height = height;
-        m_image_width = width;
     }
 
     int getExposureTimeUs() {
@@ -94,25 +120,23 @@ public:
     }
 
 signals:
-    void signalUpdateImage(void *, int, int);
+    void signalUpdateImage(QImage);
 
 private:
     // 用户继承采集事件处理类
     class CSampleCaptureEventHandler : public ICaptureEventHandler {
     public:
         void DoOnImageCaptured(CImageDataPointer &objImageDataPointer, void *pUserParam) {
-            CameraController *camera = (CameraController *) pUserParam;
-            QMutexLocker locker(camera->getImageMutex());
+            CameraController *camera = static_cast<CameraController *>(pUserParam);
+            std::lock_guard<std::mutex> locker(camera->getImageMutex());
 
             try {
-                void *image_data = camera->getBufferPtr();
-                int height = objImageDataPointer->GetHeight();
-                int width = objImageDataPointer->GetWidth();
+                std::memcpy(camera->getBuffer().data(), objImageDataPointer->GetBuffer(), camera->getBufferSize());
 
-                camera->captureUpdateImageSize(height, width);
-                std::memcpy(image_data, objImageDataPointer->GetBuffer(), height * width);
-
-                emit camera->signalUpdateImage(image_data, height, width);
+                emit camera->signalUpdateImage(QImage(camera->getBuffer().data(),
+                                                      camera->getImageWidth(),
+                                                      camera->getImageHeight(),
+                                                      QImage::Format_Grayscale8));
             } catch (CGalaxyException) {
                 // do noting
             }
@@ -297,40 +321,13 @@ private:
         m_bIsSnap = false;
     }
 
-    void cameraInitTask() {
-        // 初始化库
-        IGXFactory::GetInstance().Init();
-
-        m_pCaptureEventHandler = new CSampleCaptureEventHandler();
-
-        // 打开设备
-        openDevice();
-
-        // 开始采集
-        startSnap();
-
-        // 图像数据内存空间初始化
-        m_pBuffer = malloc(m_objFeatureControlPtr->GetIntFeature("WidthMax")->GetValue() * m_objFeatureControlPtr->GetIntFeature("HeightMax")->GetValue());
-        if (NULL == m_pBuffer) {
-            std::cout << "failed to malloc" << std::endl;
-            return;
-        }
-    }
-
     void cameraInit() {
-        std::thread video_camera_Thread(&CameraController::cameraInitTask, this);
-        video_camera_Thread.detach();
-    }
+        try {
+            // 初始化库
+            IGXFactory::GetInstance().Init();
 
-    void cameraClose() {
-        // 停止采集
-        stopSnap();
-
-        // 关闭设备
-        closeDevice();
-
-        delete m_pCaptureEventHandler;
-        delete m_pBuffer;
+            m_pCaptureEventHandler = new CSampleCaptureEventHandler();
+        } catch (...) {}
     }
 
 private:
@@ -343,11 +340,12 @@ private:
     bool m_bIsOpen;
     bool m_bIsSnap;
 
-    QMutex m_image_mutex;
+    std::mutex m_image_mutex;
     CImageDataPointer m_image_data_pointer;
-    void *m_pBuffer = nullptr;
+    std::vector<uint8_t> m_pBuffer;
     int m_image_height;
     int m_image_width;
+    int m_buffer_size;
 
     int m_exposure_time_us;
     int m_exposure_gain_dB;
