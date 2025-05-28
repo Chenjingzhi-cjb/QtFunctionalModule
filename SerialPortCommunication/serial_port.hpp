@@ -124,9 +124,7 @@ public:
     }
 
     ~SerialPort() {
-        if (m_serial.isOpen()) {
-            m_serial.close();
-        }
+        close();
     }
 
 public slots:
@@ -209,6 +207,7 @@ public:
 
     void close() {
         if (m_serial.isOpen()) {
+            stopSendContinue();
             m_serial.close();
         }
     }
