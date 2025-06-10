@@ -22,6 +22,7 @@ private:
               m_bIsSnap(false),
               m_image_height(0),
               m_image_width(0),
+              m_buffer_size(0),
               m_exposure_time_us(10000),
               m_exposure_gain_dB(0) {
         cameraInit();
@@ -45,14 +46,22 @@ public:
         return instance;
     }
 
+    bool isCameraOpen() {
+        return (m_bIsOpen && m_bIsSnap);
+    }
+
     void openCamera() {
         std::lock_guard<std::mutex> locker(m_image_mutex);
 
         // 打开设备
         openDevice();
 
+        if (!m_bIsOpen) return;
+
         // 开始采集
         startSnap();
+
+        if (!m_bIsSnap) return;
 
         // 图像数据内存空间初始化
         m_image_height = m_objFeatureControlPtr->GetIntFeature("Height")->GetValue();
@@ -84,6 +93,8 @@ public:
     }
 
     cv::Mat getImage() {
+        if (!m_bIsOpen || !m_bIsSnap) return cv::Mat();
+
         std::lock_guard<std::mutex> locker(m_image_mutex);
 
         return cv::Mat(m_image_height, m_image_width, CV_8UC1, m_pBuffer.data()).clone();
@@ -102,6 +113,8 @@ public:
     }
 
     void setExposureTimeUs(int exposure_time_us) {
+        if (!m_bIsOpen || !m_bIsSnap) return;
+
         if ((exposure_time_us < 10000) || (exposure_time_us > 500000)) return;
 
         m_exposure_time_us = exposure_time_us;
@@ -113,10 +126,18 @@ public:
     }
 
     void setExposureGainDB(int exposure_gain_dB) {
+        if (!m_bIsOpen || !m_bIsSnap) return;
+
         if ((exposure_gain_dB < 0) || (exposure_gain_dB > 24)) return;
 
         m_exposure_gain_dB = exposure_gain_dB;
         m_objFeatureControlPtr->GetFloatFeature("Gain")->SetValue(m_exposure_gain_dB);
+    }
+
+    void CameraController::setAutoExposureOnce() {
+        if (!m_bIsOpen || !m_bIsSnap) return;
+
+        m_objFeatureControlPtr->GetEnumFeature("ExposureAuto")->SetValue("Once");
     }
 
 signals:
@@ -318,7 +339,6 @@ private:
         }
 
         m_bIsOpen = false;
-        m_bIsSnap = false;
     }
 
     void cameraInit() {
