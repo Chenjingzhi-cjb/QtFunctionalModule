@@ -134,7 +134,7 @@ public:
         m_objFeatureControlPtr->GetFloatFeature("Gain")->SetValue(m_exposure_gain_dB);
     }
 
-    void CameraController::setAutoExposureOnce() {
+    void setAutoExposureOnce() {
         if (!m_bIsOpen || !m_bIsSnap) return;
 
         m_objFeatureControlPtr->GetEnumFeature("ExposureAuto")->SetValue("Once");
