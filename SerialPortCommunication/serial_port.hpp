@@ -129,20 +129,71 @@ public:
 
 public slots:
     void sendAsciiDataQ(const QString &ascii_data) {
-        sendAsciiData(ascii_data.toStdString());
+        QMutexLocker locker(&m_serial_mutex);
+
+        if (m_serial.isOpen()) {
+            QByteArray _data = ascii_data.toUtf8();
+            m_serial.write(_data);
+
+            std::cout << "Serial port send : " << ascii_data.toStdString() << std::endl;
+        }
+    }
+
+    void sendAsciiData(const std::string &ascii_data) {
+        sendAsciiDataQ(QString::fromStdString(ascii_data));
     }
 
     void sendHexDataQ(const QString &hex_data) {
-        sendHexData(hex_data.toStdString());
+        QMutexLocker locker(&m_serial_mutex);
+
+        if (m_serial.isOpen()) {
+            QStringList hex_byte_list = hex_data.split(" ");
+            QByteArray _data;
+            for (const QString &hex_byte : hex_byte_list) {
+                char byte = static_cast<char>(hex_byte.toInt(nullptr, 16));
+                _data.append(byte);
+            }
+            m_serial.write(_data);
+
+            std::cout << "Serial port send : " << hex_data.toStdString() << std::endl;
+        }
+    }
+
+    void sendHexData(const std::string &hex_data) {
+        sendHexDataQ(QString::fromStdString(hex_data));
     }
 
     void sendContinueAsciiDataQ(const QString &ascii_data, unsigned int intervals, unsigned int times = 0) {
-        sendContinueAsciiData(ascii_data.toStdString(), intervals, times);
+        if (!m_serial.isOpen()) return;
+
+        m_send_thread_flag = true;
+
+        SerialPortSendThread *thread = new SerialPortSendThread(this, ascii_data, false, intervals, times, m_send_thread_flag);
+
+        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+
+        thread->start();
+    }
+
+    void sendContinueAsciiData(const std::string &ascii_data, unsigned int intervals, unsigned int times = 0) {
+        sendContinueAsciiDataQ(QString::fromStdString(ascii_data), intervals, times);
     }
 
     void sendContinueHexDataQ(const QString &hex_data, unsigned int intervals, unsigned int times = 0) {
-        sendContinueHexData(hex_data.toStdString(), intervals, times);
+        if (!m_serial.isOpen()) return;
+
+        m_send_thread_flag = true;
+
+        SerialPortSendThread *thread = new SerialPortSendThread(this, hex_data, true, intervals, times, m_send_thread_flag);
+
+        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
+
+        thread->start();
     }
+
+    void sendContinueHexData(const std::string &hex_data, unsigned int intervals, unsigned int times = 0) {
+        sendContinueHexDataQ(QString::fromStdString(hex_data), intervals, times);
+    }   
 
     void sendContinueMultiAsciiDataQ(const QStringList &ascii_data_list, unsigned int intervals, unsigned int times = 0) {
         if (!m_serial.isOpen()) return;
@@ -216,57 +267,6 @@ public:
         return m_serial.isOpen();
     }
 
-    void sendAsciiData(const std::string &ascii_data) {
-        QMutexLocker locker(&m_serial_mutex);
-
-        if (m_serial.isOpen()) {
-            QByteArray _data = QString::fromStdString(ascii_data).toUtf8();
-            m_serial.write(_data);
-
-            std::cout << "Serial port send : " << ascii_data << std::endl;
-        }
-    }
-
-    void sendHexData(const std::string &hex_data) {
-        QMutexLocker locker(&m_serial_mutex);
-
-        if (m_serial.isOpen()) {
-            QStringList hex_byte_list = QString::fromStdString(hex_data).split(" ");
-            QByteArray _data;
-            for (const QString &hex_byte : hex_byte_list) {
-                char byte = static_cast<char>(hex_byte.toInt(nullptr, 16));
-                _data.append(byte);
-            }
-            m_serial.write(_data);
-
-            std::cout << "Serial port send : " << hex_data << std::endl;
-        }
-    }
-
-    void sendContinueAsciiData(const std::string &ascii_data, unsigned int intervals, unsigned int times = 0) {
-        if (!m_serial.isOpen()) return;
-
-        m_send_thread_flag = true;
-
-        SerialPortSendThread *thread = new SerialPortSendThread(this, QString::fromStdString(ascii_data), false, intervals, times, m_send_thread_flag);
-
-        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
-
-        thread->start();
-    }
-
-    void sendContinueHexData(const std::string &hex_data, unsigned int intervals, unsigned int times = 0) {
-        if (!m_serial.isOpen()) return;
-
-        m_send_thread_flag = true;
-
-        SerialPortSendThread *thread = new SerialPortSendThread(this, QString::fromStdString(hex_data), true, intervals, times, m_send_thread_flag);
-
-        connect(thread, &QThread::finished, thread, &QObject::deleteLater);
-
-        thread->start();
-    }
-
     void setReceiveEndCharCompleteCheck(QByteArray end_char) {
         m_end_char = end_char;
         m_use_end_char_flag = true;
@@ -291,20 +291,20 @@ private slots:
     }
 
 signals:
-    void signalReceiveAsciiData(const std::string &data);
+    void signalReceiveAsciiData(const QString &data);
 
-    void signalReceiveHexData(const std::string &data);
+    void signalReceiveHexData(const QString &data);
 
 private:
     void transferReceiveData(const QByteArray &data) {
         // Hex Data
-        std::string hex_data = data.toHex(' ').toUpper().toStdString();
-        std::cout << "Serial port receive : " << hex_data << std::endl;
+        QString hex_data = data.toHex(' ').toUpper();
+        std::cout << "Serial port receive : " << hex_data.toStdString() << std::endl;
         emit signalReceiveHexData(hex_data);
 
         // Ascii Data
-        std::string ascii_data = data.toStdString();
-        std::cout << "Serial port receive : " << ascii_data << std::endl;
+        QString ascii_data = QString::fromUtf8(data);
+        std::cout << "Serial port receive : " << ascii_data.toStdString() << std::endl;
         emit signalReceiveAsciiData(ascii_data);
     }
 
