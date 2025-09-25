@@ -7,6 +7,7 @@
 #include <vector>
 #include <chrono>
 #include <iomanip>
+#include <ctime>
 
 
 class Stopwatch {
@@ -44,6 +45,22 @@ public:
         }
 
         std::cout << "-----------------------------------\n" << std::endl;
+    }
+
+    /**
+     * @brief 获取当前时间的格式化字符串
+     * @return 格式为 "YYYYMMDDhhmmss" 的时间字符串，例如 "20250925122505"
+     */
+    static std::string getCurrentTimeFormatted() {
+        auto now = std::chrono::system_clock::now();
+        std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+        std::tm *p_tm = std::localtime(&now_c);
+
+        // 格式化输出
+        std::stringstream ss;
+        ss << std::put_time(p_tm, "%Y%m%d%H%M%S");
+
+        return ss.str();
     }
 
 private:
