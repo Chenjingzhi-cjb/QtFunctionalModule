@@ -22,8 +22,7 @@ namespace FileEnumerator {
     inline std::vector<std::string> getFiles(
             const std::string &folderPath,
             const std::set<std::string> &extensions = {},
-            bool recursive = false
-    ) {
+            bool recursive = false) {
         std::vector<std::string> result;
 
         if (folderPath.empty()) {
@@ -121,8 +120,7 @@ namespace FileEnumerator {
     inline std::vector<std::string> getRelativePaths(
             const std::string &folderPath,
             const std::set<std::string> &extensions = {},
-            bool recursive = false
-    ) {
+            bool recursive = false) {
         auto fullPaths = getFiles(folderPath, extensions, recursive);
         std::vector<std::string> relativePaths;
         relativePaths.reserve(fullPaths.size());
@@ -152,8 +150,7 @@ namespace FileEnumerator {
     inline std::vector<std::string> getFileNames(
             const std::string &folderPath,
             const std::set<std::string> &extensions = {},
-            bool recursive = false
-    ) {
+            bool recursive = false) {
         auto fullPaths = getFiles(folderPath, extensions, recursive);
         std::vector<std::string> fileNames;
         fileNames.reserve(fullPaths.size());
@@ -201,8 +198,7 @@ namespace FileEnumerator {
     inline size_t countFiles(
             const std::string &folderPath,
             const std::set<std::string> &extensions = {},
-            bool recursive = false
-    ) {
+            bool recursive = false) {
         size_t count = 0;
 
         if (folderPath.empty()) {
@@ -311,8 +307,7 @@ namespace FileSuffixProcess {
      */
     inline std::vector<std::string> changeFilesExtension(
             const std::vector<std::string> &filePaths,
-            const std::string &newExtension
-    ) {
+            const std::string &newExtension) {
         if (newExtension.empty()) {
             throw std::invalid_argument("New extension cannot be empty");
         }
@@ -373,11 +368,12 @@ namespace FileSuffixProcess {
     }
 
     /**
-     * 获取不包含扩展名的文件名（仅文件名部分，不包含路径）
+     * 获取包含或不包含扩展名的文件名（仅文件名部分，不包含路径）
      * @param filePath 文件路径
-     * @return 不包含扩展名的文件名
+     * @param extension 是否包含扩展名
+     * @return 包含或不包含扩展名的文件名
      */
-    inline std::string getFileBaseName(const std::string &filePath) {
+    inline std::string getFileBaseName(const std::string &filePath, bool extension = true) {
         if (filePath.empty()) {
             return "";
         }
@@ -386,9 +382,11 @@ namespace FileSuffixProcess {
         std::string fileName = (slashPos != std::string::npos) ?
                                filePath.substr(slashPos + 1) : filePath;
 
-        size_t dotPos = fileName.find_last_of('.');
-        if (dotPos != std::string::npos && dotPos > 0) {
-            return fileName.substr(0, dotPos);
+        if (!extension) {
+            size_t dotPos = fileName.find_last_of('.');
+            if (dotPos != std::string::npos && dotPos > 0) {
+                return fileName.substr(0, dotPos);
+            }
         }
 
         return fileName;
