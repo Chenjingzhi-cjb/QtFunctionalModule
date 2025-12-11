@@ -1,0 +1,70 @@
+# ------------------------------- MinGW -------------------------------
+
+# Build
+```
+cd spdlog && mkdir mingw-build && cd mingw-build
+cmake -G "MinGW Makefiles" -DSPDLOG_BUILD_SHARED=OFF .. && mingw32-make
+```
+
+# CMakeLists.txt
+```
+set(SPDLOG_ROOT "D:/Project/spdlog-1.x")
+include_directories("${SPDLOG_ROOT}/include")
+link_directories("${SPDLOG_ROOT}/mingw-build")
+add_definitions(-DSPDLOG_COMPILED_LIB)  # 必须定义此宏
+
+target_link_libraries(main spdlog)
+```
+
+# ------------------------------- MSVC -------------------------------
+
+# VS 2019: "Visual Studio 16 2019"
+# VS 2017: "Visual Studio 15 2017"
+# VS 2015: "Visual Studio 14 2015"
+
+# Build
+```
+cd spdlog && mkdir msvc-build && cd msvc-build
+cmake -G "Visual Studio 17 2022" -A x64 -DSPDLOG_BUILD_SHARED=OFF ..
+cmake --build . --config Release
+cmake --build . --config Debug  # 如果需要 Debug 版本
+```
+
+# CMakeLists.txt
+```
+set(SPDLOG_ROOT "D:/Project/spdlog-1.x")
+include_directories("${SPDLOG_ROOT}/include")
+link_directories("${SPDLOG_ROOT}/msvc-build/Release")  # 或 Debug
+add_definitions(-DSPDLOG_COMPILED_LIB)  # 必须定义此宏
+
+target_link_libraries(main spdlog)  # 或 spdlogd
+```
+or
+```
+set(SPDLOG_ROOT "D:/Project/spdlog-1.x")
+include_directories("${SPDLOG_ROOT}/include")
+add_definitions(-DSPDLOG_COMPILED_LIB)
+
+target_link_libraries(main 
+    debug "${SPDLOG_ROOT}/msvc-build/Debug/spdlogd.lib"
+    optimized "${SPDLOG_ROOT}/msvc-build/Release/spdlog.lib"
+)
+```
+
+# Qt QMake .pro
+```
+SPDLOG_ROOT = "D:/Project/spdlog-1.x"
+
+INCLUDEPATH += $$SPDLOG_ROOT/include
+
+DEFINES += SPDLOG_COMPILED_LIB
+
+QMAKE_CXXFLAGS += /utf-8
+QMAKE_CFLAGS += /utf-8
+
+CONFIG(debug, debug|release) {
+    LIBS += -L$$SPDLOG_ROOT/msvc-build/Debug -lspdlogd
+} else {
+    LIBS += -L$$SPDLOG_ROOT/msvc-build/Release -lspdlog
+}
+```
