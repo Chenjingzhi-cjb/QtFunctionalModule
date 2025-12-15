@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QImage>
+#include <QTimer>
 
 #include <iostream>
 #include <exception>
@@ -22,9 +23,7 @@ private:
               m_bIsSnap(false),
               m_image_height(0),
               m_image_width(0),
-              m_buffer_size(0),
-              m_exposure_time_us(10000),
-              m_exposure_gain_dB(0) {
+              m_buffer_size(0) {
         cameraInit();
     }
 
@@ -42,7 +41,6 @@ private:
 public:
     static CameraController &getInstance() {
         static CameraController instance;  // 局部静态变量，注意生命周期
-
         return instance;
     }
 
@@ -108,40 +106,44 @@ public:
         return m_pBuffer;
     }
 
-    int getExposureTimeUs() {
-        return m_exposure_time_us;
+    double getExposureTimeUs() {
+        return m_objFeatureControlPtr->GetFloatFeature("ExposureTime")->GetValue();
     }
 
-    void setExposureTimeUs(int exposure_time_us) {
+    void setExposureTimeUs(double exposure_time_us) {
         if (!m_bIsOpen || !m_bIsSnap) return;
 
-        if ((exposure_time_us < 10000) || (exposure_time_us > 500000)) return;
+        if ((exposure_time_us < 1000) || (exposure_time_us > 1000000)) return;
 
-        m_exposure_time_us = exposure_time_us;
-        m_objFeatureControlPtr->GetFloatFeature("ExposureTime")->SetValue(m_exposure_time_us);
+        m_objFeatureControlPtr->GetFloatFeature("ExposureTime")->SetValue(exposure_time_us);
     }
 
-    int getExposureGainDB() {
-        return m_exposure_gain_dB;
+    double getExposureGainDB() {
+        return m_objFeatureControlPtr->GetFloatFeature("Gain")->GetValue();
     }
 
-    void setExposureGainDB(int exposure_gain_dB) {
+    void setExposureGainDB(double exposure_gain_dB) {
         if (!m_bIsOpen || !m_bIsSnap) return;
 
         if ((exposure_gain_dB < 0) || (exposure_gain_dB > 24)) return;
 
-        m_exposure_gain_dB = exposure_gain_dB;
-        m_objFeatureControlPtr->GetFloatFeature("Gain")->SetValue(m_exposure_gain_dB);
+        m_objFeatureControlPtr->GetFloatFeature("Gain")->SetValue(exposure_gain_dB);
     }
 
-    void setAutoExposureOnce() {
+    void setAutoExposureOnce(int wait_msec = 1000) {
         if (!m_bIsOpen || !m_bIsSnap) return;
 
         m_objFeatureControlPtr->GetEnumFeature("ExposureAuto")->SetValue("Once");
+
+        QTimer::singleShot(wait_msec, [=]() {
+            emit signalAutoExposureTimeUs(getExposureTimeUs());
+        });
     }
 
 signals:
     void signalUpdateImage(QImage);
+
+    void signalAutoExposureTimeUs(double);
 
 private:
     // 用户继承采集事件处理类
@@ -171,11 +173,11 @@ private:
         // 设置 触发模式 为 关
         m_objFeatureControlPtr->GetEnumFeature("TriggerMode")->SetValue("Off");
 
-        // 设置 曝光时间
-        m_objFeatureControlPtr->GetFloatFeature("ExposureTime")->SetValue(m_exposure_time_us);
+        // 设置 初始曝光时间
+        m_objFeatureControlPtr->GetFloatFeature("ExposureTime")->SetValue(10000);
 
-        // 设置 曝光增益
-        m_objFeatureControlPtr->GetFloatFeature("Gain")->SetValue(m_exposure_gain_dB);
+        // 设置 初始曝光增益
+        m_objFeatureControlPtr->GetFloatFeature("Gain")->SetValue(0);
     }
 
     void openDevice() {
@@ -366,9 +368,6 @@ private:
     int m_image_height;
     int m_image_width;
     int m_buffer_size;
-
-    int m_exposure_time_us;
-    int m_exposure_gain_dB;
 };
 
 
