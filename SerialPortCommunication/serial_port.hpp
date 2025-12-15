@@ -109,7 +109,8 @@ class SerialPort : public QObject {
 public:
     explicit SerialPort(QObject *parent = nullptr)
         : QObject(parent),
-          m_send_thread_flag(true) {}
+          m_send_thread_flag(false),
+          m_use_end_char_flag(false) {}
 
     SerialPort(const QString &port_name,
                QSerialPort::BaudRate baud_rate = QSerialPort::Baud115200,
@@ -119,7 +120,8 @@ public:
                QSerialPort::FlowControl flow_control = QSerialPort::NoFlowControl,
                QObject *parent = nullptr)
             : QObject(parent),
-              m_send_thread_flag(true) {
+              m_send_thread_flag(false),
+              m_use_end_char_flag(false) {
         open(port_name, baud_rate, parity, data_bits, stop_bits, flow_control);
     }
 
