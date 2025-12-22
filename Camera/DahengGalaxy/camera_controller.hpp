@@ -78,6 +78,17 @@ public:
         m_pBuffer.clear();
     }
 
+    void enterTriggerMode() {
+        m_objFeatureControlPtr->GetEnumFeature("TriggerSelector")->SetValue("FrameStart");
+        m_objFeatureControlPtr->GetEnumFeature("TriggerSource")->SetValue("Software");
+        m_objFeatureControlPtr->GetEnumFeature("TriggerMode")->SetValue("On");
+    }
+
+    void exitTriggerMode() {
+        m_objFeatureControlPtr->GetEnumFeature("TriggerSelector")->SetValue("FrameStart");
+        m_objFeatureControlPtr->GetEnumFeature("TriggerMode")->SetValue("Off");
+    }
+
     int getImageWidth() {
         return m_image_width;
     }
@@ -138,6 +149,11 @@ public:
         QTimer::singleShot(wait_msec, [=]() {
             emit signalAutoExposureTimeUs(getExposureTimeUs());
         });
+    }
+
+public slots:
+    void slotSoftwareTrigger() {
+        m_objFeatureControlPtr->GetCommandFeature("TriggerSoftware")->Execute();
     }
 
 signals:
