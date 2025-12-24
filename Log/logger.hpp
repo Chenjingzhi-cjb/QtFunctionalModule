@@ -4,6 +4,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/rotating_file_sink.h>
+#include <spdlog/sinks/daily_file_sink.h>
 #include <memory>
 #include <mutex>
 
@@ -47,9 +48,28 @@ public:
             auto logger = std::make_shared<spdlog::logger>("logger", sinks.begin(), sinks.end());
             logger->set_level(level);
 
+            logger->flush_on(level);
+
             spdlog::set_default_logger(logger);
             spdlog::info("Logger initialized (level: {})", spdlog::level::to_string_view(level));
         });
+    }
+
+    void removeConsoleSink() {
+        try {
+            auto logger = spdlog::default_logger();
+            auto &sinks = logger->sinks();
+
+            for (auto it = sinks.begin(); it != sinks.end(); ) {
+                if (dynamic_cast<spdlog::sinks::stdout_color_sink_mt*>(it->get())) {
+                    it = sinks.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        } catch (const spdlog::spdlog_ex &ex) {
+            spdlog::error("Console sink removed failed: {}", ex.what());
+        }
     }
 
     void addFileSink(const std::string &file_path, bool truncate = true) {
@@ -77,6 +97,19 @@ public:
                          file_path, max_file_size, max_files);
         } catch (const spdlog::spdlog_ex &ex) {
             spdlog::error("Rotating file sink add failed: {}", ex.what());
+        }
+    }
+
+    void addDailyFileSink(const std::string &file_path, int rotation_hour = 0, int rotation_minute = 0) {
+        try {
+            auto daily_sink = std::make_shared<spdlog::sinks::daily_file_sink_mt>(
+                file_path, rotation_hour, rotation_minute);
+            daily_sink->set_pattern(ThisLoggerPattern);
+
+            spdlog::default_logger()->sinks().push_back(daily_sink);
+            spdlog::info("Daily file sink added: {}", file_path);
+        } catch (const spdlog::spdlog_ex &ex) {
+            spdlog::error("Daily file sink add failed: {}", ex.what());
         }
     }
 
